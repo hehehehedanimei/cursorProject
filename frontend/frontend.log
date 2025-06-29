@@ -1,0 +1,10 @@
+
+> deployment-flow-frontend@0.0.0 dev
+> vite --port 3001
+
+
+  VITE v4.5.14  ready in 255 ms
+
+  ➜  Local:   http://localhost:3001/
+  ➜  Network: use --host to expose
+  ➜  press h to show help

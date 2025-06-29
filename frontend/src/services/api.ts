@@ -11,7 +11,7 @@ import {
 
 // 字段名转换函数：snake_case 转 camelCase
 const toCamelCase = (str: string): string => {
-  return str.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 };
 
 // 递归转换对象字段名

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Row, 
   Col, 
@@ -7,55 +7,59 @@ import {
   List, 
   Badge, 
   Progress, 
-  Statistic, 
   Empty,
   Modal,
   Form,
   Input,
+  Checkbox,
   message
 } from 'antd';
 import { 
-  PlayCircleOutlined, 
   PlusOutlined, 
-  ClockCircleOutlined,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined
+  ClockCircleOutlined
 } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { RootState, AppDispatch } from '../store';
-import { fetchTasks, createTask, setCurrentTask } from '../store/slices/taskSlice';
-import { fetchSteps } from '../store/slices/stepSlice';
-import { generateTodoList } from '../store/slices/stepSlice';
+import { fetchTasks, createTask, fetchCurrentTask } from '../store/slices/taskSlice';
+import { fetchSteps, fetchTodoList } from '../store/slices/stepSlice';
 
 const Dashboard: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [flowTypes, setFlowTypes] = useState<any[]>([]);
   const [form] = Form.useForm();
-  const [isModalVisible, setIsModalVisible] = React.useState(false);
 
-  const { tasks, currentTask, loading } = useSelector((state: RootState) => state.task);
-  const { todoList } = useSelector((state: RootState) => state.step);
+  const { currentTask, loading } = useSelector((state: RootState) => state.task);
+  const { todoList, steps } = useSelector((state: RootState) => state.step);
 
   useEffect(() => {
     dispatch(fetchTasks());
+    dispatch(fetchCurrentTask()); // 从API获取当前任务
+    // 获取流程类型
+    fetchFlowTypes();
   }, [dispatch]);
 
   useEffect(() => {
     if (currentTask) {
-      dispatch(fetchSteps(currentTask.id)).then(() => {
-        dispatch(generateTodoList(currentTask.id));
-      });
-    } else if (tasks.length > 0) {
-      // 如果没有当前任务，自动选择第一个draft状态的任务
-      const activeTask = tasks.find(task => 
-        task.status === 'draft' || task.status === 'in_progress'
-      );
-      if (activeTask) {
-        dispatch(setCurrentTask(activeTask));
-      }
+      dispatch(fetchSteps(currentTask.id));
+      dispatch(fetchTodoList(currentTask.id));
     }
-  }, [currentTask, tasks, dispatch]);
+  }, [currentTask, dispatch]);
+
+  // 获取流程类型列表
+  const fetchFlowTypes = async () => {
+    try {
+      const response = await fetch('/api/tasks/flow-types');
+      const data = await response.json();
+      if (data.success) {
+        setFlowTypes(data.data);
+      }
+    } catch (error) {
+      console.error('获取流程类型失败:', error);
+    }
+  };
 
   const handleCreateTask = async (values: any) => {
     try {
@@ -74,13 +78,7 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // 统计数据
-  const statistics = {
-    total: tasks.length,
-    inProgress: tasks.filter(t => t.status === 'in_progress').length,
-    completed: tasks.filter(t => t.status === 'completed').length,
-    failed: tasks.filter(t => t.status === 'failed').length,
-  };
+
 
   // 获取优先级颜色
   const getPriorityColor = (priority: string) => {
@@ -94,48 +92,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div>
-      <Row gutter={[16, 16]}>
-        {/* 统计卡片 */}
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="总任务数"
-              value={statistics.total}
-              prefix={<ExclamationCircleOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="进行中"
-              value={statistics.inProgress}
-              prefix={<PlayCircleOutlined />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="已完成"
-              value={statistics.completed}
-              prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="失败"
-              value={statistics.failed}
-              prefix={<ExclamationCircleOutlined />}
-              valueStyle={{ color: '#ff4d4f' }}
-            />
-          </Card>
-        </Col>
-      </Row>
+
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         {/* 当前任务 */}
@@ -158,13 +115,30 @@ const Dashboard: React.FC = () => {
                 <p style={{ color: '#666', marginBottom: 16 }}>
                   {currentTask.description}
                 </p>
-                <Progress 
-                  percent={50} 
-                  status="active"
-                  format={() => '进行中'}
-                />
+                {(() => {
+                  // 计算实际进度
+                  const completedSteps = steps.filter(s => s.status === 'completed').length;
+                  const totalSteps = steps.length;
+                  const progress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+                  
+                  return (
+                    <Progress 
+                      percent={progress} 
+                      status={progress === 100 ? 'success' : 'active'}
+                      format={() => `${completedSteps}/${totalSteps} 完成`}
+                    />
+                  );
+                })()}
                 <div style={{ marginTop: 12, fontSize: 12, color: '#999' }}>
-                  创建时间: {new Date((currentTask as any).created_time || (currentTask as any).createdTime).toLocaleString()}
+                  创建时间: {new Date((currentTask as any).created_time || (currentTask as any).createdTime).toLocaleString('zh-CN', {
+                    timeZone: 'Asia/Shanghai',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                  })}
                 </div>
               </div>
             ) : (
@@ -199,7 +173,24 @@ const Dashboard: React.FC = () => {
                           text=""
                         />
                       }
-                      title={item.title}
+                      title={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span>{item.title}</span>
+                          {item.flowIcon && (
+                            <span style={{ 
+                              background: '#f0f0f0', 
+                              padding: '2px 8px', 
+                              borderRadius: 12, 
+                              fontSize: 12,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4
+                            }}>
+                              {item.flowIcon} {item.flowLabel}
+                            </span>
+                          )}
+                        </div>
+                      }
                       description={
                         <div>
                           <div>{item.description}</div>
@@ -253,6 +244,20 @@ const Dashboard: React.FC = () => {
             <Input.TextArea 
               rows={3}
               placeholder="请输入任务描述（可选）"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="flowTypes"
+            label="流程类型"
+            rules={[{ required: true, message: '请选择至少一个流程类型' }]}
+            initialValue={['domestic_non_core']}
+          >
+            <Checkbox.Group 
+              options={flowTypes.map(type => ({
+                label: type.label,
+                value: type.value
+              }))}
             />
           </Form.Item>
         </Form>

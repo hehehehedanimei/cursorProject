@@ -38,6 +38,15 @@ export const deleteTask = createAsyncThunk(
   }
 );
 
+// 异步获取当前任务
+export const fetchCurrentTask = createAsyncThunk(
+  'task/fetchCurrentTask',
+  async () => {
+    const response = await taskApi.getCurrentTask();
+    return response.data;
+  }
+);
+
 interface TaskState {
   tasks: Task[];
   currentTask: Task | null;
@@ -124,6 +133,10 @@ const taskSlice = createSlice({
         if (state.currentTask && state.currentTask.id === action.payload) {
           state.currentTask = null;
         }
+      })
+      // 获取当前任务
+      .addCase(fetchCurrentTask.fulfilled, (state, action) => {
+        state.currentTask = action.payload.data || null;
       });
   },
 });

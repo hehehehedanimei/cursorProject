@@ -119,7 +119,15 @@ const History: React.FC = () => {
       title: '创建时间',
       dataIndex: ['task', 'createdTime'],
       key: 'createdTime',
-      render: (time: string) => new Date(time).toLocaleString(),
+      render: (time: string) => new Date(time).toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }),
     },
     {
       title: '操作',
@@ -204,11 +212,27 @@ const History: React.FC = () => {
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="创建时间">
-                {new Date(currentRecord.task.createdTime).toLocaleString()}
+                {new Date(currentRecord.task.createdTime).toLocaleString('zh-CN', {
+                  timeZone: 'Asia/Shanghai',
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit'
+                })}
               </Descriptions.Item>
               <Descriptions.Item label="完成时间">
                 {currentRecord.task.endTime 
-                  ? new Date(currentRecord.task.endTime).toLocaleString() 
+                  ? new Date(currentRecord.task.endTime).toLocaleString('zh-CN', {
+                      timeZone: 'Asia/Shanghai',
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit'
+                    })
                   : '未完成'
                 }
               </Descriptions.Item>
@@ -243,9 +267,36 @@ const History: React.FC = () => {
                     ),
                   },
                   {
+                    title: '开始时间',
+                    dataIndex: 'startTime',
+                    key: 'startTime',
+                    width: 140,
+                    render: (time: string) => time ? new Date(time).toLocaleString('zh-CN', {
+                      timeZone: 'Asia/Shanghai',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    }) : '-',
+                  },
+                  {
+                    title: '完成时间',
+                    dataIndex: 'endTime',
+                    key: 'endTime',
+                    width: 140,
+                    render: (time: string) => time ? new Date(time).toLocaleString('zh-CN', {
+                      timeZone: 'Asia/Shanghai',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    }) : '-',
+                  },
+                  {
                     title: '耗时(分钟)',
                     dataIndex: 'actualDuration',
                     key: 'actualDuration',
+                    width: 80,
                     render: (duration: number) => duration || '-',
                   },
                   {

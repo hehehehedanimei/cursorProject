@@ -29,6 +29,16 @@ export const copyMessage = createAsyncThunk(
   }
 );
 
+// 异步获取待办事项
+export const fetchTodoList = createAsyncThunk(
+  'step/fetchTodoList',
+  async (taskId: number) => {
+    const response = await fetch(`/api/tasks/${taskId}/todos`);
+    const data = await response.json();
+    return data;
+  }
+);
+
 interface StepState {
   steps: TaskStep[];
   currentStep: TaskStep | null;
@@ -76,44 +86,10 @@ const stepSlice = createSlice({
         }
       }
     },
-    generateTodoList: (state, action: PayloadAction<number>) => {
-      const taskId = action.payload;
-      const taskSteps = state.steps.filter(s => s.taskId === taskId);
-      
-      // 生成待办事项逻辑
-      const todos: TodoItem[] = [];
-      
-      // 找到下一个需要执行的步骤
-      const nextStep = taskSteps.find(s => s.status === StepStatus.PENDING);
-      if (nextStep) {
-        todos.push({
-          id: `step-${nextStep.id}`,
-          title: nextStep.stepName,
-          description: `执行${nextStep.stepName}`,
-          priority: 'high',
-          estimatedTime: nextStep.estimatedDuration || 0,
-          action: 'operate',
-          stepId: nextStep.id,
-          taskId: taskId,
-        });
-      }
-      
-      // 找到需要确认的步骤
-      const confirmSteps = taskSteps.filter(s => s.status === StepStatus.IN_PROGRESS);
-      confirmSteps.forEach(step => {
-        todos.push({
-          id: `confirm-${step.id}`,
-          title: `确认${step.stepName}完成`,
-          description: `请确认${step.stepName}是否已完成`,
-          priority: 'medium',
-          estimatedTime: 5,
-          action: 'confirm',
-          stepId: step.id,
-          taskId: taskId,
-        });
-      });
-      
-      state.todoList = todos;
+    // 保留本地generateTodoList以备用，但现在主要使用fetchTodoList
+    generateTodoList: (_, action: PayloadAction<number>) => {
+      // 这个函数现在主要用于兼容性，实际应该调用fetchTodoList
+      console.log('⚠️ 使用了本地generateTodoList，应该使用fetchTodoList:', action.payload);
     },
     clearError: (state) => {
       state.error = null;
@@ -150,6 +126,18 @@ const stepSlice = createSlice({
       // 复制消息
       .addCase(copyMessage.fulfilled, () => {
         // 消息复制成功的处理逻辑
+      })
+      // 获取待办事项
+      .addCase(fetchTodoList.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchTodoList.fulfilled, (state, action) => {
+        state.loading = false;
+        state.todoList = action.payload.data || [];
+      })
+      .addCase(fetchTodoList.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || '获取待办事项失败';
       });
   },
 });

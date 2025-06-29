@@ -14,6 +14,16 @@ router.get('/', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
+// 获取流程类型列表
+router.get('/flow-types', async (req, res) => {
+    try {
+        const flowTypes = (0, flowGenerator_1.getSupportedFlowTypes)();
+        res.json({ success: true, data: flowTypes });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 // 获取当前任务
 router.get('/current', async (req, res) => {
     try {
@@ -24,14 +34,29 @@ router.get('/current', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
+// 获取单个任务
+router.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const task = await connection_1.Database.get('SELECT * FROM tasks WHERE id = ?', [id]);
+        if (!task) {
+            return res.status(404).json({ success: false, message: '任务不存在' });
+        }
+        res.json({ success: true, data: task });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 // 创建新任务
 router.post('/', async (req, res) => {
     try {
-        const { name, description } = req.body;
+        const { name, description, flowTypes } = req.body;
         const result = await connection_1.Database.run('INSERT INTO tasks (name, description, status) VALUES (?, ?, ?)', [name, description || '', 'draft']);
         const taskId = result.lastID;
-        // 生成默认步骤
-        await (0, flowGenerator_1.generateStepsForTask)(taskId, 'non_core_deployment');
+        // 生成选定的流程步骤
+        const selectedFlowTypes = flowTypes || ['domestic_non_core'];
+        await (0, flowGenerator_1.generateStepsForTask)(taskId, selectedFlowTypes);
         const task = await connection_1.Database.get('SELECT * FROM tasks WHERE id = ?', [taskId]);
         res.json({ success: true, data: task });
     }

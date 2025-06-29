@@ -10,10 +10,9 @@ router.get('/', async (req, res) => {
     const pageSize = parseInt(req.query.pageSize as string) || 10;
     const offset = (page - 1) * pageSize;
 
-    // 获取已完成或失败的任务
+    // 获取所有任务（包括进行中的任务）
     const tasks = await Database.all(
       `SELECT * FROM tasks 
-       WHERE status IN ('completed', 'failed') 
        ORDER BY updated_time DESC 
        LIMIT ? OFFSET ?`,
       [pageSize, offset]
@@ -21,8 +20,7 @@ router.get('/', async (req, res) => {
 
     // 获取总数
     const countResult = await Database.get(
-      `SELECT COUNT(*) as total FROM tasks 
-       WHERE status IN ('completed', 'failed')`
+      `SELECT COUNT(*) as total FROM tasks`
     );
     const total = countResult?.total || 0;
 

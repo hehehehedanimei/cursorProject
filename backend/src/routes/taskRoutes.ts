@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Database } from '../database/connection';
-import { generateStepsForTask } from '../utils/flowGenerator';
+import { generateStepsForTask, getSupportedFlowTypes } from '../utils/flowGenerator';
 
 const router = Router();
 
@@ -9,6 +9,16 @@ router.get('/', async (req, res) => {
   try {
     const tasks = await Database.all('SELECT * FROM tasks ORDER BY created_time DESC');
     res.json({ success: true, data: tasks });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 获取流程类型列表
+router.get('/flow-types', async (req, res) => {
+  try {
+    const flowTypes = getSupportedFlowTypes();
+    res.json({ success: true, data: flowTypes });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -46,7 +56,7 @@ router.get('/:id', async (req, res) => {
 // 创建新任务
 router.post('/', async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, flowTypes } = req.body;
     
     const result = await Database.run(
       'INSERT INTO tasks (name, description, status) VALUES (?, ?, ?)',
@@ -55,8 +65,9 @@ router.post('/', async (req, res) => {
     
     const taskId = result.lastID;
     
-    // 生成默认步骤
-    await generateStepsForTask(taskId, 'non_core_deployment');
+    // 生成选定的流程步骤
+    const selectedFlowTypes = flowTypes || ['domestic_non_core'];
+    await generateStepsForTask(taskId, selectedFlowTypes);
     
     const task = await Database.get('SELECT * FROM tasks WHERE id = ?', [taskId]);
     res.json({ success: true, data: task });
@@ -124,20 +135,73 @@ router.get('/:id/todos', async (req, res) => {
       [id]
     );
     
-    // 生成待办事项
+    // 流程类型映射
+    const flowTypeMap: { [key: string]: { label: string; icon: string } } = {
+      'domestic_non_core': { label: '国内非核心', icon: '🏠' },
+      'international_non_core': { label: '国际非核心', icon: '🌍' },
+      'international_crawler': { label: '国际爬虫', icon: '🕷️' }
+    };
+    
+    // 检查步骤是否可以执行（依赖检查）
+    const canExecuteStep = (step: any): boolean => {
+      if (step.status !== 'pending') {
+        return false;
+      }
+      
+      let dependencies = [];
+      try {
+        dependencies = JSON.parse(step.dependencies || '[]');
+      } catch (e) {
+        dependencies = [];
+      }
+      
+      // 检查所有依赖步骤是否已完成
+      for (const depOrder of dependencies) {
+        const depStep = steps.find(s => s.step_order === depOrder);
+        if (!depStep || depStep.status !== 'completed') {
+          return false;
+        }
+      }
+      
+      return true;
+    };
+    
+    // 生成所有可执行的待办事项（支持并行）
     const todos = [];
-    const nextStep = steps.find(s => s.status === 'pending');
-    if (nextStep) {
-      todos.push({
-        id: `step-${nextStep.id}`,
-        title: nextStep.step_name,
-        description: `执行${nextStep.step_name}`,
-        priority: 'high',
-        estimatedTime: nextStep.estimated_duration || 0,
-        action: 'operate',
-        stepId: nextStep.id,
-        taskId: id,
-      });
+    for (const step of steps) {
+      if (canExecuteStep(step)) {
+        const flowInfo = flowTypeMap[step.notes] || { label: step.notes, icon: '📋' };
+        todos.push({
+          id: `step-${step.id}`,
+          title: step.step_name,
+          description: `执行${step.step_name}`,
+          flowType: step.notes,
+          flowLabel: flowInfo.label,
+          flowIcon: flowInfo.icon,
+          priority: 'high',
+          estimatedTime: step.estimated_duration || 0,
+          action: 'operate',
+          stepId: step.id,
+          taskId: id,
+        });
+      }
+      // 添加需要确认完成的步骤
+      if (step.status === 'in_progress') {
+        const flowInfo = flowTypeMap[step.notes] || { label: step.notes, icon: '📋' };
+        todos.push({
+          id: `confirm-${step.id}`,
+          title: `确认${step.step_name}完成`,
+          description: `请确认${step.step_name}是否已完成`,
+          flowType: step.notes,
+          flowLabel: flowInfo.label,
+          flowIcon: flowInfo.icon,
+          priority: 'medium',
+          estimatedTime: 2,
+          action: 'confirm',
+          stepId: step.id,
+          taskId: id,
+        });
+      }
     }
     
     res.json({ success: true, data: todos });
