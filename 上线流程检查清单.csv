@@ -1,0 +1,19 @@
+﻿检查项目,状态,服务器类型,地区,核心程度,IDC,分组,服务路径,网址
+国内DS_非核心-IDC1-A组,未开始,DS,国内,非核心,IDC1,A组,bjhotel.java.goods.ds.hatch.idc1.a,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.ds.hatch.idc1.a
+国内DS_非核心-IDC1-B组,未开始,DS,国内,非核心,IDC1,B组,bjhotel.java.goods.ds.hatch.idc1.b,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.ds.hatch.idc1.b
+国内DS_非核心-IDC2-A组,未开始,DS,国内,非核心,IDC2,A组,bjhotel.java.goods.ds.hatch.idc2.a,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.ds.hatch.idc2.a
+国内DS_非核心-IDC2-B组,未开始,DS,国内,非核心,IDC2,B组,bjhotel.java.goods.ds.hatch.idc2.b,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.ds.hatch.idc2.b
+国内SERVICE_非核心-IDC1,未开始,SERVICE,国内,非核心,IDC1,不适用,bjhotel.java.goods.service.hatch.idc1,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.service.hatch.idc1
+国内SERVICE_非核心-IDC2,未开始,SERVICE,国内,非核心,IDC2,不适用,bjhotel.java.goods.service.hatch.idc2,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.service.hatch.idc2
+国际_DS_非核心组_IDC1_A,未开始,DS,国际,核心,IDC1,A组,bjhotel.java.goods.ds.inter.idc1.a,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.ds.inter.idc1.a
+国际_DS_非核心组_IDC1_B,未开始,DS,国际,核心,IDC1,B组,bjhotel.java.goods.ds.inter.idc1.b,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.ds.inter.idc1.b
+国际_DS_非核心组_IDC2_A,未开始,DS,国际,核心,IDC2,A组,bjhotel.java.goods.ds.inter.idc2.a,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.ds.inter.idc2.a
+国际_DS_非核心组_IDC2_B,未开始,DS,国际,核心,IDC2,B组,bjhotel.java.goods.ds.inter.idc2.b,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.ds.inter.idc2.b
+"国际_DS_爬虫组_A ",未开始,DS,国际,非核心,混合部署,A组,bjhotel.java.goods.ds.inter.hatch.a,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.ds.inter.hatch.a
+国际_DS_爬虫组_B,未开始,DS,国际,非核心,混合部署,B组,bjhotel.java.goods.ds.inter.hatch.b,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.ds.inter.hatch.b
+国际_SERVICE_非核心_IDC1,未开始,SERVICE,国际,核心,IDC1,不适用,bjhotel.java.goods.service.inter.idc1,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.service.inter.idc1
+国际_SERVICE_非核心_IDC2,未开始,SERVICE,国际,核心,IDC2,不适用,bjhotel.java.goods.service.inter.idc2,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.service.inter.idc2
+国际_SERVICE_爬虫组_IDC1,未开始,SERVICE,国际,非核心,IDC1,不适用,bjhotel.java.goods.service.inter.hatch.idc1,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.service.inter.hatch.idc1
+国际_SERVICE_爬虫组_IDC2,未开始,SERVICE,国际,非核心,IDC2,不适用,bjhotel.java.goods.service.inter.hatch.idc2,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.service.inter.hatch.idc2
+国际_API_核心,未开始,API,国际,核心,混合部署,不适用,bjhotel.java.goods.serviceapi.inter,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.serviceapi.inter
+国际_API_非核心,未开始,API,国际,非核心,混合部署,不适用,bjhotel.java.goods.serviceapi.inter..hatch,https://jean.corp.elong.com/v3/access/#/plat/resources/bjhotel.java.goods.serviceapi.inter..hatch

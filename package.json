@@ -1,0 +1,48 @@
+{
+  "name": "deployment-flow-manager",
+  "version": "1.0.0",
+  "description": "上线流程管理工具",
+  "main": "electron/main.js",
+  "scripts": {
+    "install-all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "frontend:dev": "cd frontend && npm run dev",
+    "backend:dev": "cd backend && npm run dev",
+    "build": "npm run frontend:build && npm run backend:build",
+    "frontend:build": "cd frontend && npm run build",
+    "backend:build": "cd backend && npm run build",
+    "electron:dev": "concurrently \"npm run backend:dev\" \"wait-on http://localhost:3001 && electron .\"",
+    "electron:pack": "npm run build && electron-builder",
+    "dist": "npm run build && electron-builder --publish=never"
+  },
+  "keywords": ["deployment", "workflow", "management"],
+  "author": "Developer",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4",
+    "wait-on": "^7.0.1"
+  },
+  "build": {
+    "appId": "com.company.deployment-flow-manager",
+    "productName": "上线流程管理工具",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/",
+      "backend/dist/",
+      "frontend/dist/"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+} 
