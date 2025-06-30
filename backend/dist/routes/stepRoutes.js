@@ -3,6 +3,27 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const connection_1 = require("../database/connection");
 const router = (0, express_1.Router)();
+// 获取任务的步骤列表
+router.get('/task/:taskId', async (req, res) => {
+    try {
+        const { taskId } = req.params;
+        const steps = await connection_1.Database.all('SELECT * FROM task_steps WHERE task_id = ? ORDER BY step_order', [taskId]);
+        res.json({ success: true, data: steps });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+// 获取所有步骤
+router.get('/', async (req, res) => {
+    try {
+        const steps = await connection_1.Database.all('SELECT * FROM task_steps ORDER BY id');
+        res.json({ success: true, data: steps });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 // 更新步骤
 router.put('/:id', async (req, res) => {
     try {
@@ -15,6 +36,24 @@ router.put('/:id', async (req, res) => {
         end_time = COALESCE(?, end_time)
        WHERE id = ?`, [status, notes, startTime, endTime, id]);
         const step = await connection_1.Database.get('SELECT * FROM task_steps WHERE id = ?', [id]);
+        // 如果步骤完成，检查任务是否应该自动完成
+        if (status === 'completed' && step) {
+            const taskId = step.task_id;
+            // 获取任务的所有步骤
+            const allSteps = await connection_1.Database.all('SELECT * FROM task_steps WHERE task_id = ?', [taskId]);
+            // 检查是否所有步骤都已完成
+            const totalSteps = allSteps.length;
+            const completedSteps = allSteps.filter(s => s.status === 'completed').length;
+            if (totalSteps > 0 && completedSteps === totalSteps) {
+                // 所有步骤都完成了，自动完成任务
+                await connection_1.Database.run(`UPDATE tasks SET 
+            status = 'completed',
+            end_time = CURRENT_TIMESTAMP,
+            updated_time = CURRENT_TIMESTAMP
+           WHERE id = ?`, [taskId]);
+                console.log(`任务 ${taskId} 自动完成：所有 ${totalSteps} 个步骤已完成`);
+            }
+        }
         res.json({ success: true, data: step });
     }
     catch (error) {

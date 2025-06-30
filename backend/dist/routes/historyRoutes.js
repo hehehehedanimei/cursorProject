@@ -9,14 +9,12 @@ router.get('/', async (req, res) => {
         const page = parseInt(req.query.page) || 1;
         const pageSize = parseInt(req.query.pageSize) || 10;
         const offset = (page - 1) * pageSize;
-        // 获取已完成或失败的任务
+        // 获取所有任务（包括进行中的任务）
         const tasks = await connection_1.Database.all(`SELECT * FROM tasks 
-       WHERE status IN ('completed', 'failed') 
        ORDER BY updated_time DESC 
        LIMIT ? OFFSET ?`, [pageSize, offset]);
         // 获取总数
-        const countResult = await connection_1.Database.get(`SELECT COUNT(*) as total FROM tasks 
-       WHERE status IN ('completed', 'failed')`);
+        const countResult = await connection_1.Database.get(`SELECT COUNT(*) as total FROM tasks`);
         const total = countResult?.total || 0;
         // 为每个任务构建详细记录
         const records = [];

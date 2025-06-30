@@ -251,7 +251,7 @@ const Dashboard: React.FC = () => {
             name="flowTypes"
             label="流程类型"
             rules={[{ required: true, message: '请选择至少一个流程类型' }]}
-            initialValue={['domestic_non_core']}
+            initialValue={['domestic_non_core', 'international_non_core', 'international_crawler']}
           >
             <Checkbox.Group 
               options={flowTypes.map(type => ({

@@ -194,42 +194,46 @@ const FLOW_TYPES = {
     'international_crawler': INTERNATIONAL_CRAWLER_STEPS,
     'non_core_deployment': DOMESTIC_NON_CORE_STEPS // 向后兼容
 };
-// 为任务生成步骤（支持多种流程类型）
+// 流程编号区间定义（避免冲突，支持独立并行）
+const FLOW_ORDER_RANGES = {
+    'domestic_non_core': 1, // 1-99
+    'international_non_core': 100, // 100-199  
+    'international_crawler': 200 // 200-299
+};
+// 为任务生成步骤（支持独立并行的多种流程类型）
 async function generateStepsForTask(taskId, flowTypes) {
     const flowTypeArray = Array.isArray(flowTypes) ? flowTypes : [flowTypes];
-    let allSteps = [];
-    let stepOrderOffset = 0;
-    // 合并多个流程的步骤
+    // 为每个流程类型生成独立的步骤
     for (const flowType of flowTypeArray) {
         const steps = FLOW_TYPES[flowType] || DOMESTIC_NON_CORE_STEPS;
-        // 调整步骤顺序和依赖关系
-        const adjustedSteps = steps.map((step, index) => {
+        const baseOrder = FLOW_ORDER_RANGES[flowType] || 1;
+        // 每个流程使用独立的编号区间，依赖关系调整到对应区间
+        for (let i = 0; i < steps.length; i++) {
+            const step = steps[i];
+            // 调整依赖关系到当前流程的编号区间
             let adjustedDependencies = '[]';
-            // 解析原始依赖
             try {
                 const originalDeps = JSON.parse(step.dependencies);
                 if (originalDeps.length > 0) {
-                    // 调整依赖关系的编号
-                    const newDeps = originalDeps.map((dep) => dep + stepOrderOffset);
+                    const newDeps = originalDeps.map((dep) => dep + baseOrder - 1);
                     adjustedDependencies = JSON.stringify(newDeps);
                 }
             }
             catch (e) {
                 adjustedDependencies = '[]';
             }
-            return {
-                ...step,
-                stepOrder: index + 1 + stepOrderOffset,
-                dependencies: adjustedDependencies
-            };
-        });
-        allSteps = allSteps.concat(adjustedSteps);
-        stepOrderOffset += steps.length;
-    }
-    // 插入步骤到数据库
-    for (const step of allSteps) {
-        await connection_1.Database.run(`INSERT INTO task_steps (task_id, step_order, step_name, step_type, status, estimated_duration, dependencies, notes) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [taskId, step.stepOrder, step.stepName, step.stepType, 'pending', step.estimatedDuration, step.dependencies, step.category]);
+            await connection_1.Database.run(`INSERT INTO task_steps (task_id, step_order, step_name, step_type, status, estimated_duration, dependencies, notes) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+                taskId,
+                baseOrder + i, // 使用流程特定的编号区间
+                step.stepName,
+                step.stepType,
+                'pending',
+                step.estimatedDuration,
+                adjustedDependencies, // 调整后的依赖关系
+                step.category // 用于标识流程类型
+            ]);
+        }
     }
 }
 // 获取支持的流程类型

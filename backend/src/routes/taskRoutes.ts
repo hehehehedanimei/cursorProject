@@ -58,15 +58,33 @@ router.post('/', async (req, res) => {
   try {
     const { name, description, flowTypes } = req.body;
     
+    // 检查是否已有进行中的任务
+    const existingTask = await Database.get(
+      'SELECT * FROM tasks WHERE status = ?',
+      ['in_progress']
+    );
+    
+    if (existingTask) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `已存在进行中的任务"${existingTask.name}"，请先完成或暂停该任务` 
+      });
+    }
+    
+    // 获取当前东八区时间
+    const now = new Date();
+    const beijingTime = new Date(now.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+    const startTime = new Date(now.getTime() + 8 * 60 * 60 * 1000).toISOString();
+    
     const result = await Database.run(
-      'INSERT INTO tasks (name, description, status) VALUES (?, ?, ?)',
-      [name, description || '', 'draft']
+      'INSERT INTO tasks (name, description, status, start_time, created_time, updated_time) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, description || '', 'in_progress', startTime, beijingTime, beijingTime]
     );
     
     const taskId = result.lastID;
     
-    // 生成选定的流程步骤
-    const selectedFlowTypes = flowTypes || ['domestic_non_core'];
+    // 生成选定的流程步骤，默认选择全部类型
+    const selectedFlowTypes = flowTypes || ['domestic_non_core', 'international_non_core', 'international_crawler'];
     await generateStepsForTask(taskId, selectedFlowTypes);
     
     const task = await Database.get('SELECT * FROM tasks WHERE id = ?', [taskId]);
