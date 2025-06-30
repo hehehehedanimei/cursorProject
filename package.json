@@ -13,7 +13,8 @@
     "backend:build": "cd backend && npm run build",
     "electron:dev": "concurrently \"npm run backend:dev\" \"wait-on http://localhost:3001 && electron .\"",
     "electron:pack": "npm run build && electron-builder",
-    "dist": "npm run build && electron-builder --publish=never"
+    "dist": "npm run build && ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ electron-builder --publish=never",
+    "app": "open \"dist/mac-arm64/上线流程管理工具.app\""
   },
   "keywords": ["deployment", "workflow", "management"],
   "author": "Developer",
@@ -34,6 +35,12 @@
       "electron/",
       "backend/dist/",
       "frontend/dist/"
+    ],
+    "extraResources": [
+      {
+        "from": "backend/dist",
+        "to": "backend/dist"
+      }
     ],
     "mac": {
       "category": "public.app-category.developer-tools"
