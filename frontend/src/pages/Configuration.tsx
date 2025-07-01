@@ -10,7 +10,12 @@ import {
   Input, 
   Select,
   message,
-  Popconfirm
+  Popconfirm,
+  InputNumber,
+  Tag,
+  Collapse,
+  Row,
+  Col
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
@@ -24,8 +29,13 @@ const { TabPane } = Tabs;
 const Configuration: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const [form] = Form.useForm();
+  const [flowForm] = Form.useForm();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isFlowModalVisible, setIsFlowModalVisible] = useState(false);
   const [editingService, setEditingService] = useState<any>(null);
+  const [flowTemplates, setFlowTemplates] = useState<any>({});
+  const [editingFlowType, setEditingFlowType] = useState<string>('');
+  const [editingFlowSteps, setEditingFlowSteps] = useState<any[]>([]);
 
   const { services, loading } = useSelector((state: RootState) => state.service);
   const { configs, templates } = useSelector((state: RootState) => state.config);
@@ -34,7 +44,110 @@ const Configuration: React.FC = () => {
     dispatch(fetchServices());
     dispatch(fetchConfigs());
     dispatch(fetchTemplates());
+    fetchFlowTemplates();
   }, [dispatch]);
+
+  // 获取流程模板配置
+  const fetchFlowTemplates = async () => {
+    try {
+      const response = await fetch('/api/configs/flow-templates');
+      const data = await response.json();
+      if (data.success) {
+        // 按流程类型分组
+        const grouped = data.data.reduce((acc: any, template: any) => {
+          if (!acc[template.flow_type]) {
+            acc[template.flow_type] = [];
+          }
+          acc[template.flow_type].push(template);
+          return acc;
+        }, {});
+        setFlowTemplates(grouped);
+      }
+    } catch (error) {
+      console.error('获取流程模板失败:', error);
+    }
+  };
+
+  // 编辑流程模板
+  const handleEditFlowTemplate = (flowType: string) => {
+    const templates = flowTemplates[flowType] || [];
+    setEditingFlowType(flowType);
+    setEditingFlowSteps(templates.map((t: any) => ({
+      stepName: t.step_name,
+      stepType: t.step_type,
+      estimatedDuration: t.estimated_duration,
+      dependencies: JSON.parse(t.dependencies || '[]')
+    })));
+    setIsFlowModalVisible(true);
+  };
+
+  // 保存流程模板
+  const handleSaveFlowTemplate = async () => {
+    try {
+      const response = await fetch(`/api/configs/flow-templates/${editingFlowType}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          templates: editingFlowSteps
+        })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        message.success('流程模板保存成功');
+        setIsFlowModalVisible(false);
+        fetchFlowTemplates();
+      } else {
+        message.error(data.message || '保存失败');
+      }
+    } catch (error) {
+      message.error('保存失败');
+    }
+  };
+
+  // 重置流程模板
+  const handleResetFlowTemplate = async (flowType: string) => {
+    try {
+      const response = await fetch(`/api/configs/flow-templates/${flowType}/reset`, {
+        method: 'POST'
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        message.success('流程模板已重置为默认配置');
+        fetchFlowTemplates();
+      } else {
+        message.error(data.message || '重置失败');
+      }
+    } catch (error) {
+      message.error('重置失败');
+    }
+  };
+
+  // 添加流程步骤
+  const handleAddFlowStep = () => {
+    setEditingFlowSteps([...editingFlowSteps, {
+      stepName: '',
+      stepType: 'config',
+      estimatedDuration: 5,
+      dependencies: []
+    }]);
+  };
+
+  // 删除流程步骤
+  const handleRemoveFlowStep = (index: number) => {
+    const newSteps = editingFlowSteps.filter((_, i) => i !== index);
+    setEditingFlowSteps(newSteps);
+  };
+
+  // 更新流程步骤
+  const handleUpdateFlowStep = (index: number, field: string, value: any) => {
+    const newSteps = [...editingFlowSteps];
+    newSteps[index] = { ...newSteps[index], [field]: value };
+    setEditingFlowSteps(newSteps);
+  };
 
   const handleCreateService = async (values: any) => {
     try {
@@ -223,7 +336,180 @@ const Configuration: React.FC = () => {
             />
           </Card>
         </TabPane>
+
+        <TabPane tab="流程配置" key="flows">
+          <Card title="流程模板配置">
+            <Row gutter={[16, 16]}>
+              {Object.entries({
+                'domestic_non_core': { label: '国内非核心', color: '#1890ff', icon: '🏠' },
+                'international_non_core': { label: '国际非核心', color: '#52c41a', icon: '🌍' },
+                'international_crawler': { label: '国际爬虫', color: '#fa8c16', icon: '🕷️' }
+              }).map(([flowType, info]) => {
+                const templates = flowTemplates[flowType] || [];
+                return (
+                  <Col xs={24} md={8} key={flowType}>
+                    <Card
+                      size="small"
+                      title={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 20 }}>{info.icon}</span>
+                          <span style={{ color: info.color }}>{info.label}</span>
+                          <Tag color={info.color}>{templates.length} 步骤</Tag>
+                        </div>
+                      }
+                      extra={
+                        <Space>
+                          <Button 
+                            size="small" 
+                            type="primary"
+                            onClick={() => handleEditFlowTemplate(flowType)}
+                          >
+                            编辑
+                          </Button>
+                          <Popconfirm
+                            title="确定重置为默认配置吗？"
+                            onConfirm={() => handleResetFlowTemplate(flowType)}
+                          >
+                            <Button size="small">重置</Button>
+                          </Popconfirm>
+                        </Space>
+                      }
+                    >
+                      <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                        {templates.map((template: any, index: number) => (
+                          <div key={index} style={{ 
+                            padding: '4px 0', 
+                            borderBottom: index < templates.length - 1 ? '1px solid #f0f0f0' : 'none',
+                            fontSize: 12 
+                          }}>
+                            <div style={{ fontWeight: 'bold' }}>
+                              {index + 1}. {template.step_name}
+                            </div>
+                            <div style={{ color: '#666' }}>
+                              <Tag color={
+                                template.step_type === 'config' ? 'blue' :
+                                template.step_type === 'deploy' ? 'green' :
+                                template.step_type === 'verify' ? 'orange' :
+                                template.step_type === 'switch' ? 'purple' : 'default'
+                              }>
+                                {template.step_type === 'config' ? '配置' :
+                                 template.step_type === 'deploy' ? '部署' :
+                                 template.step_type === 'verify' ? '验证' :
+                                 template.step_type === 'switch' ? '切换' : template.step_type}
+                              </Tag>
+                              {template.estimated_duration}分钟
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  </Col>
+                );
+              })}
+            </Row>
+          </Card>
+        </TabPane>
       </Tabs>
+
+      {/* 流程配置编辑模态框 */}
+      <Modal
+        title={`编辑流程模板 - ${editingFlowType === 'domestic_non_core' ? '国内非核心' : 
+                             editingFlowType === 'international_non_core' ? '国际非核心' : 
+                             editingFlowType === 'international_crawler' ? '国际爬虫' : editingFlowType}`}
+        open={isFlowModalVisible}
+        onOk={handleSaveFlowTemplate}
+        onCancel={() => {
+          setIsFlowModalVisible(false);
+          setEditingFlowType('');
+          setEditingFlowSteps([]);
+        }}
+        width={800}
+        okText="保存"
+        cancelText="取消"
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Button 
+            type="dashed" 
+            onClick={handleAddFlowStep}
+            style={{ width: '100%' }}
+          >
+            + 添加步骤
+          </Button>
+        </div>
+        
+        <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+          {editingFlowSteps.map((step, index) => (
+            <Card 
+              key={index} 
+              size="small" 
+              style={{ marginBottom: 8 }}
+              title={`步骤 ${index + 1}`}
+              extra={
+                <Button 
+                  size="small" 
+                  danger 
+                  onClick={() => handleRemoveFlowStep(index)}
+                >
+                  删除
+                </Button>
+              }
+            >
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item label="步骤名称" style={{ marginBottom: 8 }}>
+                    <Input
+                      value={step.stepName}
+                      placeholder="请输入步骤名称"
+                      onChange={(e) => handleUpdateFlowStep(index, 'stepName', e.target.value)}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item label="步骤类型" style={{ marginBottom: 8 }}>
+                    <Select
+                      value={step.stepType}
+                      onChange={(value) => handleUpdateFlowStep(index, 'stepType', value)}
+                    >
+                      <Select.Option value="config">配置</Select.Option>
+                      <Select.Option value="deploy">部署</Select.Option>
+                      <Select.Option value="verify">验证</Select.Option>
+                      <Select.Option value="switch">切换</Select.Option>
+                      <Select.Option value="rollback">回滚</Select.Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item label="预计时长(分钟)" style={{ marginBottom: 8 }}>
+                    <InputNumber
+                      value={step.estimatedDuration}
+                      min={1}
+                      max={300}
+                      onChange={(value) => handleUpdateFlowStep(index, 'estimatedDuration', value || 5)}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item label="依赖步骤" style={{ marginBottom: 0 }}>
+                <Select
+                  mode="multiple"
+                  value={step.dependencies}
+                  placeholder="选择依赖的步骤（按步骤顺序）"
+                  onChange={(value) => handleUpdateFlowStep(index, 'dependencies', value)}
+                >
+                  {editingFlowSteps.map((_, depIndex) => {
+                    if (depIndex >= index) return null; // 只能依赖前面的步骤
+                    return (
+                      <Select.Option key={depIndex + 1} value={depIndex + 1}>
+                        步骤 {depIndex + 1}
+                      </Select.Option>
+                    );
+                  })}
+                </Select>
+              </Form.Item>
+            </Card>
+          ))}
+        </div>
+      </Modal>
 
       {/* 服务配置模态框 */}
       <Modal

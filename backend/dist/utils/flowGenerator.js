@@ -200,20 +200,29 @@ const FLOW_ORDER_RANGES = {
     'international_non_core': 100, // 100-199  
     'international_crawler': 200 // 200-299
 };
-// 为任务生成步骤（支持独立并行的多种流程类型）
+// 为任务生成步骤（支持独立并行的多种流程类型，使用数据库模板配置）
 async function generateStepsForTask(taskId, flowTypes) {
     const flowTypeArray = Array.isArray(flowTypes) ? flowTypes : [flowTypes];
     // 为每个流程类型生成独立的步骤
     for (const flowType of flowTypeArray) {
-        const steps = FLOW_TYPES[flowType] || DOMESTIC_NON_CORE_STEPS;
+        // 从数据库获取流程模板配置
+        const templates = await connection_1.Database.all('SELECT * FROM flow_templates WHERE flow_type = ? ORDER BY step_order', [flowType]);
+        // 如果数据库中没有模板，使用默认配置并插入数据库
+        if (templates.length === 0) {
+            console.warn(`流程类型 ${flowType} 没有模板配置，使用默认配置`);
+            await initDefaultTemplatesForType(flowType);
+            // 重新获取模板
+            const newTemplates = await connection_1.Database.all('SELECT * FROM flow_templates WHERE flow_type = ? ORDER BY step_order', [flowType]);
+            templates.push(...newTemplates);
+        }
         const baseOrder = FLOW_ORDER_RANGES[flowType] || 1;
         // 每个流程使用独立的编号区间，依赖关系调整到对应区间
-        for (let i = 0; i < steps.length; i++) {
-            const step = steps[i];
+        for (let i = 0; i < templates.length; i++) {
+            const template = templates[i];
             // 调整依赖关系到当前流程的编号区间
             let adjustedDependencies = '[]';
             try {
-                const originalDeps = JSON.parse(step.dependencies);
+                const originalDeps = JSON.parse(template.dependencies || '[]');
                 if (originalDeps.length > 0) {
                     const newDeps = originalDeps.map((dep) => dep + baseOrder - 1);
                     adjustedDependencies = JSON.stringify(newDeps);
@@ -226,14 +235,40 @@ async function generateStepsForTask(taskId, flowTypes) {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
                 taskId,
                 baseOrder + i, // 使用流程特定的编号区间
-                step.stepName,
-                step.stepType,
+                template.step_name,
+                template.step_type,
                 'pending',
-                step.estimatedDuration,
+                template.estimated_duration,
                 adjustedDependencies, // 调整后的依赖关系
-                step.category // 用于标识流程类型
+                flowType // 用于标识流程类型
             ]);
         }
+    }
+}
+// 为特定流程类型初始化默认模板
+async function initDefaultTemplatesForType(flowType) {
+    const defaultTemplates = {
+        'domestic_non_core': DOMESTIC_NON_CORE_STEPS,
+        'international_non_core': INTERNATIONAL_NON_CORE_STEPS,
+        'international_crawler': INTERNATIONAL_CRAWLER_STEPS
+    };
+    const templates = defaultTemplates[flowType];
+    if (!templates)
+        return;
+    for (let i = 0; i < templates.length; i++) {
+        const template = templates[i];
+        await connection_1.Database.run(`INSERT INTO flow_templates (
+        flow_type, step_name, step_type, estimated_duration, 
+        step_order, dependencies, category
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
+            flowType,
+            template.stepName,
+            template.stepType,
+            template.estimatedDuration,
+            i + 1,
+            template.dependencies,
+            flowType
+        ]);
     }
 }
 // 获取支持的流程类型

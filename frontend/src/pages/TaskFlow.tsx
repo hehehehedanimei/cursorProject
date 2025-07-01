@@ -405,7 +405,7 @@ const TaskFlow: React.FC = () => {
       <Card>
         <Row gutter={16} style={{ minHeight: '600px' }}>
           {/* 左侧流程类型Tab */}
-          <Col xs={24} lg={8}>
+          <Col xs={24} lg={10}>
             <Tabs
               tabPosition="left"
               size="large"
@@ -497,7 +497,7 @@ const TaskFlow: React.FC = () => {
           </Col>
 
           {/* 右侧步骤详情 */}
-          <Col xs={24} lg={16}>
+          <Col xs={24} lg={14}>
             <Card 
               title="步骤详情" 
               extra={

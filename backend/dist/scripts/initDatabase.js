@@ -69,6 +69,18 @@ const createTables = [
     config_value TEXT NOT NULL,
     description TEXT,
     updated_time DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+    `CREATE TABLE IF NOT EXISTS flow_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    flow_type VARCHAR(50) NOT NULL,
+    step_name VARCHAR(200) NOT NULL,
+    step_type VARCHAR(20) NOT NULL,
+    estimated_duration INTEGER NOT NULL DEFAULT 5,
+    step_order INTEGER NOT NULL,
+    dependencies TEXT DEFAULT '[]',
+    category VARCHAR(50) NOT NULL,
+    created_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_time DATETIME DEFAULT CURRENT_TIMESTAMP
   )`
 ];
 // 初始化数据库
@@ -84,10 +96,79 @@ async function initDatabase() {
         for (const sql of createTables) {
             await connection_1.Database.run(sql);
         }
+        // 初始化默认流程模板数据
+        await initDefaultFlowTemplates();
         console.log('数据库初始化完成！');
     }
     catch (error) {
         console.error('数据库初始化失败:', error);
+        throw error;
+    }
+}
+// 初始化默认流程模板数据
+async function initDefaultFlowTemplates() {
+    try {
+        // 检查是否已有流程模板数据
+        const existingTemplates = await connection_1.Database.all('SELECT COUNT(*) as count FROM flow_templates');
+        if (existingTemplates[0].count > 0) {
+            console.log('流程模板数据已存在，跳过初始化');
+            return;
+        }
+        console.log('初始化默认流程模板数据...');
+        const defaultTemplates = {
+            'domestic_non_core': [
+                { stepName: '关闭自动加载开关', stepType: 'config', estimatedDuration: 5, dependencies: [] },
+                { stepName: '检查目标版本数据', stepType: 'verify', estimatedDuration: 10, dependencies: [1] },
+                { stepName: '切流量至IDC2', stepType: 'switch', estimatedDuration: 5, dependencies: [2] },
+                { stepName: '部署国内非核心 IDC1 DS A组', stepType: 'deploy', estimatedDuration: 30, dependencies: [3] },
+                { stepName: '切DS服务至A组', stepType: 'switch', estimatedDuration: 5, dependencies: [4] },
+                { stepName: '部署国内非核心 IDC1 DS B组', stepType: 'deploy', estimatedDuration: 25, dependencies: [5] },
+                { stepName: '部署国内非核心 IDC1 Service', stepType: 'deploy', estimatedDuration: 20, dependencies: [6] },
+                { stepName: '服务预热验证', stepType: 'verify', estimatedDuration: 15, dependencies: [7] },
+                { stepName: '逐步切流量至IDC1', stepType: 'switch', estimatedDuration: 60, dependencies: [8] }
+            ],
+            'international_non_core': [
+                { stepName: '关闭国际自动加载开关', stepType: 'config', estimatedDuration: 5, dependencies: [] },
+                { stepName: '检查国际版本数据', stepType: 'verify', estimatedDuration: 10, dependencies: [1] },
+                { stepName: '切国际流量至IDC2', stepType: 'switch', estimatedDuration: 5, dependencies: [2] },
+                { stepName: '部署国际非核心 IDC1 DS A组', stepType: 'deploy', estimatedDuration: 30, dependencies: [3] },
+                { stepName: '切国际DS服务至A组', stepType: 'switch', estimatedDuration: 5, dependencies: [4] },
+                { stepName: '部署国际非核心 IDC1 DS B组', stepType: 'deploy', estimatedDuration: 25, dependencies: [5] },
+                { stepName: '部署国际非核心 IDC1 Service', stepType: 'deploy', estimatedDuration: 20, dependencies: [6] },
+                { stepName: '国际服务预热验证', stepType: 'verify', estimatedDuration: 15, dependencies: [7] },
+                { stepName: '逐步切国际流量至IDC1', stepType: 'switch', estimatedDuration: 60, dependencies: [8] }
+            ],
+            'international_crawler': [
+                { stepName: '关闭爬虫调度', stepType: 'config', estimatedDuration: 3, dependencies: [] },
+                { stepName: '检查爬虫数据一致性', stepType: 'verify', estimatedDuration: 8, dependencies: [1] },
+                { stepName: '停止爬虫服务', stepType: 'switch', estimatedDuration: 3, dependencies: [2] },
+                { stepName: '部署国际爬虫 IDC1', stepType: 'deploy', estimatedDuration: 20, dependencies: [3] },
+                { stepName: '启动爬虫服务', stepType: 'switch', estimatedDuration: 3, dependencies: [4] },
+                { stepName: '爬虫功能验证', stepType: 'verify', estimatedDuration: 10, dependencies: [5] },
+                { stepName: '恢复爬虫调度', stepType: 'switch', estimatedDuration: 3, dependencies: [6] }
+            ]
+        };
+        for (const [flowType, templates] of Object.entries(defaultTemplates)) {
+            for (let i = 0; i < templates.length; i++) {
+                const template = templates[i];
+                await connection_1.Database.run(`INSERT INTO flow_templates (
+            flow_type, step_name, step_type, estimated_duration, 
+            step_order, dependencies, category
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
+                    flowType,
+                    template.stepName,
+                    template.stepType,
+                    template.estimatedDuration,
+                    i + 1,
+                    JSON.stringify(template.dependencies),
+                    flowType
+                ]);
+            }
+        }
+        console.log('默认流程模板数据初始化完成');
+    }
+    catch (error) {
+        console.error('初始化流程模板数据失败:', error);
         throw error;
     }
 }
