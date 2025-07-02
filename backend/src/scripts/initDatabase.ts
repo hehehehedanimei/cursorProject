@@ -31,6 +31,7 @@ const createTables = [
     reminder_time DATETIME,
     dependencies TEXT,
     service_config TEXT,
+    links TEXT,
     created_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
   )`,

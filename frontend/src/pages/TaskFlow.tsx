@@ -16,7 +16,9 @@ import {
   Input,
   Form,
   Badge,
-  Tabs
+  Tabs,
+  List,
+  Typography
 } from 'antd';
 import { 
   PlayCircleOutlined, 
@@ -25,7 +27,8 @@ import {
   ClockCircleOutlined,
   CopyOutlined,
   EditOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  LinkOutlined
 } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '../store';
 import { fetchSteps, updateStep } from '../store/slices/stepSlice';
@@ -34,6 +37,7 @@ import { TaskStep, StepStatus } from '../types';
 
 const { Step } = Steps;
 const { TextArea } = Input;
+const { Link } = Typography;
 
 const TaskFlow: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -577,6 +581,49 @@ const TaskFlow: React.FC = () => {
                     )}
                   </Descriptions>
 
+                  {/* 链接列表 */}
+                  {(() => {
+                    try {
+                      const links = currentStep.links ? JSON.parse(currentStep.links) : [];
+                      if (links.length > 0) {
+                        return (
+                          <div style={{ marginTop: 16 }}>
+                            <h4 style={{ marginBottom: 8, fontSize: '14px', fontWeight: 'bold', color: '#666' }}>
+                              <LinkOutlined style={{ marginRight: 4 }} />
+                              相关链接
+                            </h4>
+                            <List
+                              size="small"
+                              dataSource={links}
+                              renderItem={(link: { name: string; url: string }, index: number) => (
+                                <List.Item style={{ padding: '4px 0', border: 'none' }}>
+                                  <Link
+                                    href={link.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ fontSize: '13px' }}
+                                  >
+                                    <LinkOutlined style={{ marginRight: 4, color: '#1890ff' }} />
+                                    {link.name}
+                                  </Link>
+                                </List.Item>
+                              )}
+                              style={{ 
+                                backgroundColor: '#f9f9f9', 
+                                padding: '8px 12px', 
+                                borderRadius: '4px',
+                                border: '1px solid #e8e8e8'
+                              }}
+                            />
+                          </div>
+                        );
+                      }
+                    } catch (e) {
+                      console.error('解析链接数据失败:', e);
+                    }
+                    return null;
+                  })()}
+
                   {/* 操作按钮 */}
                   <div style={{ marginTop: 16 }}>
                     <Space>
@@ -678,12 +725,58 @@ const TaskFlow: React.FC = () => {
           layout="vertical"
           initialValues={{
             notes: currentStep?.notes || '',
-            estimatedDuration: currentStep?.estimatedDuration || 0
+            estimatedDuration: currentStep?.estimatedDuration || 0,
+            links: (() => {
+              try {
+                const links = currentStep?.links ? JSON.parse(currentStep.links) : [];
+                return links.map((link: any) => `${link.name}|${link.url}`).join('\n');
+              } catch (e) {
+                return '';
+              }
+            })()
           }}
-          onFinish={async () => {
+          onFinish={async (values) => {
             if (currentStep) {
-              await handleStepAction('update', currentStep.id);
+              // 解析链接数据
+              let linksData = [];
+              if (values.links && values.links.trim()) {
+                try {
+                  linksData = values.links.split('\n')
+                    .filter((line: string) => line.trim())
+                    .map((line: string) => {
+                      const parts = line.split('|');
+                      if (parts.length >= 2) {
+                        return {
+                          name: parts[0].trim(),
+                          url: parts[1].trim()
+                        };
+                      }
+                      return null;
+                    })
+                    .filter(Boolean);
+                } catch (e) {
+                  message.error('链接格式错误，请使用：名称|网址 的格式，每行一个');
+                  return;
+                }
+              }
+              
+                             await dispatch(updateStep({
+                 id: currentStep.id,
+                 data: {
+                   notes: values.notes,
+                   estimatedDuration: values.estimatedDuration,
+                   links: JSON.stringify(linksData)
+                 }
+               }));
+              
+              message.success('步骤更新成功');
               setIsModalVisible(false);
+              form.resetFields();
+              
+              // 重新加载步骤数据
+              if (currentTask) {
+                dispatch(fetchSteps(currentTask.id));
+              }
             }
           }}
         >
@@ -699,6 +792,17 @@ const TaskFlow: React.FC = () => {
             label="预计时长（分钟）"
           >
             <Input type="number" min={1} />
+          </Form.Item>
+
+          <Form.Item
+            name="links"
+            label="相关链接"
+            help="每行一个链接，格式：链接名称|链接地址，例如：监控链接|https://example.com"
+          >
+            <TextArea 
+              rows={4} 
+              placeholder="链接名称|链接地址&#10;例如：&#10;监控系统|https://monitor.example.com&#10;操作手册|https://docs.example.com" 
+            />
           </Form.Item>
         </Form>
       </Modal>

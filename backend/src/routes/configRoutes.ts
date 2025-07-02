@@ -50,6 +50,8 @@ router.put('/flow-templates/:flowType', async (req, res) => {
     const { flowType } = req.params;
     const { templates } = req.body;
     
+    console.log('收到的templates数据:', JSON.stringify(templates, null, 2));
+    
     if (!Array.isArray(templates)) {
       return res.status(400).json({
         success: false,
@@ -63,11 +65,18 @@ router.put('/flow-templates/:flowType', async (req, res) => {
     // 插入新的模板配置
     for (let i = 0; i < templates.length; i++) {
       const template = templates[i];
+      const linksValue = template.links || '[]';
+      
+      console.log(`步骤 ${i+1} - ${template.stepName}:`);
+      console.log('  原始links:', template.links);
+      console.log('  处理后links:', linksValue);
+      console.log('  links类型:', typeof linksValue);
+      
       await Database.run(
         `INSERT INTO flow_templates (
           flow_type, step_name, step_type, estimated_duration, 
-          step_order, dependencies, category
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          step_order, dependencies, category, links
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           flowType,
           template.stepName,
@@ -75,7 +84,8 @@ router.put('/flow-templates/:flowType', async (req, res) => {
           template.estimatedDuration || 5,
           i + 1,
           JSON.stringify(template.dependencies || []),
-          flowType
+          flowType,
+          linksValue
         ]
       );
     }
@@ -121,14 +131,21 @@ async function initDefaultFlowTemplates(flowType?: string) {
   const defaultTemplates = {
     'domestic_non_core': [
       { stepName: '关闭自动加载开关', stepType: 'config', estimatedDuration: 5, dependencies: [] },
-      { stepName: '检查目标版本数据', stepType: 'verify', estimatedDuration: 10, dependencies: [1] },
-      { stepName: '切流量至IDC2', stepType: 'switch', estimatedDuration: 5, dependencies: [2] },
-      { stepName: '部署国内非核心 IDC1 DS A组', stepType: 'deploy', estimatedDuration: 30, dependencies: [3] },
-      { stepName: '切DS服务至A组', stepType: 'switch', estimatedDuration: 5, dependencies: [4] },
-      { stepName: '部署国内非核心 IDC1 DS B组', stepType: 'deploy', estimatedDuration: 25, dependencies: [5] },
-      { stepName: '部署国内非核心 IDC1 Service', stepType: 'deploy', estimatedDuration: 20, dependencies: [6] },
-      { stepName: '服务预热验证', stepType: 'verify', estimatedDuration: 15, dependencies: [7] },
-      { stepName: '逐步切流量至IDC1', stepType: 'switch', estimatedDuration: 60, dependencies: [8] }
+      { stepName: '流量切至IDC2', stepType: 'switch', estimatedDuration: 10, dependencies: [1] },
+      { stepName: '部署国内非核心 IDC1 DS B组', stepType: 'deploy', estimatedDuration: 30, dependencies: [2] },
+      { stepName: '部署国内非核心 IDC1 Service', stepType: 'deploy', estimatedDuration: 20, dependencies: [3] },
+      { stepName: '国内非核心 DS IDC1 切到B组，预热GS', stepType: 'switch', estimatedDuration: 10, dependencies: [4] },
+      { stepName: '服务预热验证', stepType: 'verify', estimatedDuration: 15, dependencies: [5] },
+      { stepName: '流量切至IDC1 2%', stepType: 'switch', estimatedDuration: 5, dependencies: [6] },
+      { stepName: '流量切至IDC1 5%', stepType: 'switch', estimatedDuration: 5, dependencies: [7] },
+      { stepName: '流量切至IDC1 10%', stepType: 'switch', estimatedDuration: 5, dependencies: [8] },
+      { stepName: '流量切至IDC1 20%', stepType: 'switch', estimatedDuration: 5, dependencies: [9] },
+      { stepName: '流量切至IDC1 50%', stepType: 'switch', estimatedDuration: 5, dependencies: [10] },
+      { stepName: '流量切至IDC1 80%', stepType: 'switch', estimatedDuration: 5, dependencies: [11] },
+      { stepName: '流量切至IDC1 100%', stepType: 'switch', estimatedDuration: 5, dependencies: [12] },
+      { stepName: '部署国内非核心 IDC1 DS A组', stepType: 'deploy', estimatedDuration: 25, dependencies: [13] },
+      { stepName: '国内非核心 IDC1 切至A组', stepType: 'switch', estimatedDuration: 5, dependencies: [14] },
+      { stepName: '打开自动加载开关', stepType: 'config', estimatedDuration: 3, dependencies: [15] }
     ],
     'international_non_core': [
       { stepName: '关闭国际自动加载开关', stepType: 'config', estimatedDuration: 5, dependencies: [] },
@@ -167,8 +184,8 @@ async function initDefaultFlowTemplates(flowType?: string) {
       await Database.run(
         `INSERT INTO flow_templates (
           flow_type, step_name, step_type, estimated_duration, 
-          step_order, dependencies, category
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          step_order, dependencies, category, links
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           type,
           template.stepName,
@@ -176,7 +193,8 @@ async function initDefaultFlowTemplates(flowType?: string) {
           template.estimatedDuration,
           i + 1,
           JSON.stringify(template.dependencies),
-          type
+          type,
+          '[]' // 默认空链接
         ]
       );
     }

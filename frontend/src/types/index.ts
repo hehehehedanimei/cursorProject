@@ -78,6 +78,7 @@ export interface TaskStep {
   reminderTime?: string;
   dependencies?: string;
   serviceConfig?: string;
+  links?: string;
   createdTime: string;
 }
 

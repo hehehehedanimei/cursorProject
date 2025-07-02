@@ -76,7 +76,8 @@ const Configuration: React.FC = () => {
       stepName: t.step_name,
       stepType: t.step_type,
       estimatedDuration: t.estimated_duration,
-      dependencies: JSON.parse(t.dependencies || '[]')
+      dependencies: JSON.parse(t.dependencies || '[]'),
+      links: linksToText(JSON.parse(t.links || '[]'))
     })));
     setIsFlowModalVisible(true);
   };
@@ -84,13 +85,19 @@ const Configuration: React.FC = () => {
   // 保存流程模板
   const handleSaveFlowTemplate = async () => {
     try {
+      // 转换步骤数据，将链接文本转换为JSON格式
+      const templatesWithLinks = editingFlowSteps.map(step => ({
+        ...step,
+        links: JSON.stringify(parseLinks(step.links || ''))
+      }));
+      
       const response = await fetch(`/api/configs/flow-templates/${editingFlowType}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          templates: editingFlowSteps
+          templates: templatesWithLinks
         })
       });
       
@@ -132,7 +139,8 @@ const Configuration: React.FC = () => {
       stepName: '',
       stepType: 'config',
       estimatedDuration: 5,
-      dependencies: []
+      dependencies: [],
+      links: ''
     }]);
   };
 
@@ -147,6 +155,34 @@ const Configuration: React.FC = () => {
     const newSteps = [...editingFlowSteps];
     newSteps[index] = { ...newSteps[index], [field]: value };
     setEditingFlowSteps(newSteps);
+  };
+
+  // 解析链接文本为数组
+  const parseLinks = (linksText: string) => {
+    if (!linksText || !linksText.trim()) return [];
+    try {
+      return linksText.split('\n')
+        .filter(line => line.trim())
+        .map(line => {
+          const parts = line.split('|');
+          if (parts.length >= 2) {
+            return {
+              name: parts[0].trim(),
+              url: parts[1].trim()
+            };
+          }
+          return null;
+        })
+        .filter(Boolean);
+    } catch (e) {
+      return [];
+    }
+  };
+
+  // 链接数组转文本
+  const linksToText = (links: any[]) => {
+    if (!links || links.length === 0) return '';
+    return links.map(link => `${link.name}|${link.url}`).join('\n');
   };
 
   const handleCreateService = async (values: any) => {
@@ -489,7 +525,7 @@ const Configuration: React.FC = () => {
                   </Form.Item>
                 </Col>
               </Row>
-              <Form.Item label="依赖步骤" style={{ marginBottom: 0 }}>
+              <Form.Item label="依赖步骤" style={{ marginBottom: 8 }}>
                 <Select
                   mode="multiple"
                   value={step.dependencies}
@@ -505,6 +541,17 @@ const Configuration: React.FC = () => {
                     );
                   })}
                 </Select>
+              </Form.Item>
+              <Form.Item label="相关链接" style={{ marginBottom: 0 }}>
+                <Input.TextArea
+                  value={step.links}
+                  rows={3}
+                  placeholder="每行一个链接，格式：链接名称|链接地址&#10;例如：&#10;监控系统|https://monitor.example.com&#10;操作手册|https://docs.example.com"
+                  onChange={(e) => handleUpdateFlowStep(index, 'links', e.target.value)}
+                />
+                <div style={{ fontSize: '12px', color: '#666', marginTop: 4 }}>
+                  格式：链接名称|链接地址，每行一个
+                </div>
               </Form.Item>
             </Card>
           ))}

@@ -33,16 +33,17 @@ router.get('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, notes, startTime, endTime } = req.body;
+    const { status, notes, startTime, endTime, links } = req.body;
     
     await Database.run(
       `UPDATE task_steps SET 
         status = COALESCE(?, status),
         notes = COALESCE(?, notes),
         start_time = COALESCE(?, start_time),
-        end_time = COALESCE(?, end_time)
+        end_time = COALESCE(?, end_time),
+        links = COALESCE(?, links)
        WHERE id = ?`,
-      [status, notes, startTime, endTime, id]
+      [status, notes, startTime, endTime, links, id]
     );
     
     const step = await Database.get('SELECT * FROM task_steps WHERE id = ?', [id]);

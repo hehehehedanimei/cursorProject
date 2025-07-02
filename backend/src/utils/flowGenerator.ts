@@ -1,5 +1,20 @@
 import { Database } from '../database/connection';
 
+// 临时定义类型（后端没有统一的types文件）
+interface TaskStep {
+  id: number;
+  taskId: number;
+  stepOrder: number;
+  stepName: string;
+  stepType: string;
+  status: string;
+  estimatedDuration?: number;
+  dependencies?: string;
+  serviceConfig?: string;
+  links?: string;
+  createdTime: string;
+}
+
 // 国内非核心组上线流程步骤定义
 const DOMESTIC_NON_CORE_STEPS = [
   {
@@ -202,63 +217,108 @@ const FLOW_ORDER_RANGES = {
   'international_crawler': 200   // 200-299
 };
 
-// 为任务生成步骤（支持独立并行的多种流程类型，使用数据库模板配置）
-export async function generateStepsForTask(taskId: number, flowTypes: string | string[]): Promise<void> {
-  const flowTypeArray = Array.isArray(flowTypes) ? flowTypes : [flowTypes];
-  
-  // 为每个流程类型生成独立的步骤
-  for (const flowType of flowTypeArray) {
-    // 从数据库获取流程模板配置
-    const templates = await Database.all(
-      'SELECT * FROM flow_templates WHERE flow_type = ? ORDER BY step_order',
-      [flowType]
-    );
+// 为任务生成步骤
+export async function generateStepsForTask(taskId: number, flowTypes: string | string[]): Promise<TaskStep[]> {
+  try {
+    const flowTypeArray = Array.isArray(flowTypes) ? flowTypes : [flowTypes];
+    const allSteps: TaskStep[] = [];
     
-    // 如果数据库中没有模板，使用默认配置并插入数据库
-    if (templates.length === 0) {
-      console.warn(`流程类型 ${flowType} 没有模板配置，使用默认配置`);
-      await initDefaultTemplatesForType(flowType);
-      // 重新获取模板
-      const newTemplates = await Database.all(
+    for (const flowType of flowTypeArray) {
+      console.log(`为任务 ${taskId} 生成 ${flowType} 流程步骤`);
+      
+      // 获取流程模板
+      const templates = await Database.all(
         'SELECT * FROM flow_templates WHERE flow_type = ? ORDER BY step_order',
         [flowType]
       );
-      templates.push(...newTemplates);
-    }
-    
-    const baseOrder = FLOW_ORDER_RANGES[flowType as keyof typeof FLOW_ORDER_RANGES] || 1;
-    
-    // 每个流程使用独立的编号区间，依赖关系调整到对应区间
-    for (let i = 0; i < templates.length; i++) {
-      const template = templates[i];
       
-      // 调整依赖关系到当前流程的编号区间
-      let adjustedDependencies = '[]';
-      try {
-        const originalDeps = JSON.parse(template.dependencies || '[]');
-        if (originalDeps.length > 0) {
-          const newDeps = originalDeps.map((dep: number) => dep + baseOrder - 1);
-          adjustedDependencies = JSON.stringify(newDeps);
-        }
-      } catch (e) {
-        adjustedDependencies = '[]';
+      if (templates.length === 0) {
+        console.warn(`未找到 ${flowType} 的流程模板`);
+        continue;
       }
-      
-      await Database.run(
-        `INSERT INTO task_steps (task_id, step_order, step_name, step_type, status, estimated_duration, dependencies, notes) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          taskId, 
-          baseOrder + i, // 使用流程特定的编号区间
-          template.step_name, 
-          template.step_type, 
-          'pending', 
-          template.estimated_duration, 
-          adjustedDependencies, // 调整后的依赖关系
-          flowType // 用于标识流程类型
-        ]
-      );
+
+      // 创建步骤
+      for (const template of templates) {
+        // 使用模板中的链接数据，如果为空则使用默认链接
+        let links: { name: string; url: string }[] = [];
+        
+        if (template.links && template.links !== '[]') {
+          try {
+            links = JSON.parse(template.links);
+          } catch (e) {
+            console.warn(`解析模板链接失败: ${e}`);
+            links = [];
+          }
+        }
+        
+        // 如果模板中没有链接，则根据步骤类型添加默认链接
+        if (links.length === 0) {
+          if (template.step_type === 'verify') {
+            links = [
+              { name: '监控系统', url: 'https://monitor.example.com/dashboard' },
+              { name: '日志查看', url: 'https://logs.example.com/search' }
+            ];
+          } else if (template.step_type === 'deploy') {
+            links = [
+              { name: '部署控制台', url: 'https://deploy.example.com/console' },
+              { name: '服务状态', url: 'https://status.example.com/health' }
+            ];
+          } else if (template.step_type === 'switch') {
+            links = [
+              { name: '流量控制台', url: 'https://traffic.example.com/control' },
+              { name: '负载均衡器', url: 'https://lb.example.com/balance' }
+            ];
+          } else if (template.step_type === 'config') {
+            links = [
+              { name: '配置中心', url: 'https://config.example.com/settings' },
+              { name: '管理后台', url: 'https://admin.example.com/config' }
+            ];
+          }
+        }
+        
+        const result = await Database.run(
+          `INSERT INTO task_steps (
+            task_id, step_order, step_name, step_type, status,
+            estimated_duration, dependencies, service_config, links, notes, created_time
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+          [
+            taskId,
+            template.step_order,
+            template.step_name,
+            template.step_type,
+            'pending',
+            template.estimated_duration,
+            template.dependencies,
+            '{}',
+            JSON.stringify(links),
+            flowType  // 添加流程类型到notes字段
+          ]
+        );
+
+        const step: TaskStep = {
+          id: result.lastID!,
+          taskId: taskId,
+          stepOrder: template.step_order,
+          stepName: template.step_name,
+          stepType: template.step_type,
+          status: 'pending',
+          estimatedDuration: template.estimated_duration,
+          dependencies: template.dependencies,
+          serviceConfig: '{}',
+          links: JSON.stringify(links),
+          createdTime: new Date().toISOString()
+        };
+
+        allSteps.push(step);
+      }
     }
+
+    console.log(`✅ 为任务 ${taskId} 生成了 ${allSteps.length} 个步骤`);
+    return allSteps;
+
+  } catch (error) {
+    console.error('生成任务步骤失败:', error);
+    throw error;
   }
 }
 
