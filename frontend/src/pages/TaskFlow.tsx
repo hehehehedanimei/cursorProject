@@ -91,8 +91,8 @@ const TaskFlow: React.FC = () => {
           const flowType = step.notes || (step as any).notes || 'unknown';
           setActiveFlowType(flowType);
         }
-      } else {
-        // 否则选中第一个pending步骤
+      } else if (!currentStep) {
+        // 只有在没有当前步骤时才自动选择，避免用户操作后被强制跳转
         const pendingStep = steps.find(s => s.status === 'pending');
         if (pendingStep) {
           setCurrentStep(pendingStep);
@@ -205,6 +205,7 @@ const TaskFlow: React.FC = () => {
           };
           break;
         case 'complete':
+        case 'oneClickComplete':
           updateData = {
             status: 'completed',
             endTime: new Date().toISOString()
@@ -220,42 +221,46 @@ const TaskFlow: React.FC = () => {
           return;
       }
 
+      // 1. 先更新服务器
       await dispatch(updateStep({ id: stepId, data: updateData })).unwrap();
-      message.success(`步骤${action === 'start' ? '开始' : action === 'complete' ? '完成' : '失败'}！`);
+      message.success(`步骤${action === 'start' ? '开始' : (action === 'complete' || action === 'oneClickComplete') ? '完成' : '失败'}！`);
       
-      // 重新加载步骤数据
+      // 2. 总是重新加载服务器最新数据，确保状态同步
       if (currentTask) {
-        await dispatch(fetchSteps(currentTask.id));
+        const result = await dispatch(fetchSteps(currentTask.id));
+        const updatedSteps = (result.payload as any)?.data || result.payload;
         
-        // 如果是完成操作，自动选择下一个可执行的步骤
-        if (action === 'complete') {
-          setTimeout(() => {
-            // 在更新后的steps中查找下一个可执行的步骤
-            const updatedSteps = [...steps];
-                         // 更新当前步骤状态
-             const currentStepIndex = updatedSteps.findIndex(s => s.id === stepId);
-             if (currentStepIndex !== -1) {
-               updatedSteps[currentStepIndex] = { ...updatedSteps[currentStepIndex], status: StepStatus.COMPLETED };
-             }
-            
-            // 查找下一个可执行的步骤（优先同流程类型）
+        if (updatedSteps && Array.isArray(updatedSteps)) {
+          // 根据操作类型决定是否跳转
+          if (action === 'start' || action === 'fail') {
+            // 开始和失败操作：更新当前步骤状态但不跳转
+            const updatedCurrentStep = updatedSteps.find((s: any) => s.id === stepId);
+            if (updatedCurrentStep) {
+              setCurrentStep(updatedCurrentStep);
+            }
+          } else if (action === 'complete' || action === 'oneClickComplete') {
+            // 完成操作：尝试跳转到同一流程类型的下一个可执行步骤
             const currentFlowType = currentStep?.notes || (currentStep as any)?.notes;
-            const sameFlowSteps = updatedSteps.filter(s => (s.notes || (s as any).notes) === currentFlowType);
-            const nextStepInSameFlow = sameFlowSteps.find(s => s.status === 'pending' && canExecuteStepWithSteps(s, updatedSteps));
+            
+            // 修复：只在同流程类型内查找下一个可执行步骤
+            const sameFlowSteps = updatedSteps.filter((s: any) => s.notes === currentFlowType);
+            
+            // 按step_order排序，找到下一个可执行步骤
+            sameFlowSteps.sort((a: any, b: any) => (a.step_order || 0) - (b.step_order || 0));
+            const nextStepInSameFlow = sameFlowSteps.find((s: any) => s.status === 'pending' && canExecuteStepWithSteps(s, updatedSteps));
             
             if (nextStepInSameFlow) {
+              // 跳转到同流程的下一个可执行步骤，确保tab不变
               setCurrentStep(nextStepInSameFlow);
-              setActiveFlowType(currentFlowType || '');
+              // 不要改变activeFlowType，保持在当前tab
             } else {
-              // 如果同流程没有可执行步骤，查找其他流程的可执行步骤
-              const nextStep = updatedSteps.find(s => s.status === 'pending' && canExecuteStepWithSteps(s, updatedSteps));
-              if (nextStep) {
-                setCurrentStep(nextStep);
-                const flowType = nextStep.notes || (nextStep as any).notes || 'unknown';
-                setActiveFlowType(flowType);
+              // 如果同流程没有可执行步骤，更新当前步骤状态但不跳转
+              const updatedCurrentStep = updatedSteps.find((s: any) => s.id === stepId);
+              if (updatedCurrentStep) {
+                setCurrentStep(updatedCurrentStep);
               }
             }
-          }, 100);
+          }
         }
       }
     } catch (error: any) {
@@ -415,7 +420,23 @@ const TaskFlow: React.FC = () => {
               size="large"
               style={{ height: '100%' }}
               activeKey={activeFlowType}
-              onChange={(key) => setActiveFlowType(key)}
+              onChange={(key) => {
+                setActiveFlowType(key);
+                // 切换tab时，自动选择该流程类型下的第一个可执行步骤
+                const groupedSteps = groupStepsByFlowType();
+                const targetFlowSteps = groupedSteps[key] || [];
+                
+                if (targetFlowSteps.length > 0) {
+                  // 优先选择第一个可执行的步骤
+                  const executableStep = targetFlowSteps.find(step => canExecuteStep(step));
+                  if (executableStep) {
+                    setCurrentStep(executableStep);
+                  } else {
+                    // 如果没有可执行步骤，选择第一个步骤
+                    setCurrentStep(targetFlowSteps[0]);
+                  }
+                }
+              }}
               items={Object.entries(groupStepsByFlowType()).map(([flowType, flowSteps]) => {
                 const flowInfo = getFlowTypeInfo(flowType);
                 const completedCount = flowSteps.filter(s => s.status === 'completed').length;
@@ -595,7 +616,7 @@ const TaskFlow: React.FC = () => {
                             <List
                               size="small"
                               dataSource={links}
-                              renderItem={(link: { name: string; url: string }, index: number) => (
+                              renderItem={(link: { name: string; url: string }) => (
                                 <List.Item style={{ padding: '4px 0', border: 'none' }}>
                                   <Link
                                     href={link.url}
@@ -657,7 +678,7 @@ const TaskFlow: React.FC = () => {
                               </Button>
                               <Button
                                 icon={<CheckCircleOutlined />}
-                                onClick={() => handleStepAction('complete', currentStep.id)}
+                                onClick={() => handleStepAction('oneClickComplete', currentStep.id)}
                               >
                                 一键完成
                               </Button>

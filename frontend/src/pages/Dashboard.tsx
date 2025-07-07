@@ -10,16 +10,14 @@ import {
   Empty,
   Modal,
   Form,
-  Input,
-  Checkbox,
-  message,
-  Popconfirm
-} from 'antd';
-import { 
-  PlusOutlined, 
-  ClockCircleOutlined,
-  StopOutlined
-} from '@ant-design/icons';
+      Input,
+    Checkbox,
+    message
+  } from 'antd';
+  import { 
+    PlusOutlined, 
+    ClockCircleOutlined
+  } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { RootState, AppDispatch } from '../store';
@@ -127,60 +125,16 @@ const Dashboard: React.FC = () => {
                     />
                   );
                 })()}
-                
-                {/* 任务操作按钮 */}
-                <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontSize: 12, color: '#999' }}>
-                    创建时间: {new Date((currentTask as any).created_time || (currentTask as any).createdTime).toLocaleString('zh-CN', {
-                      timeZone: 'Asia/Shanghai',
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      second: '2-digit'
-                    })}
-                  </div>
-                  
-                  <Popconfirm
-                    title="强制结束任务"
-                    description="确定要强制结束当前任务吗？这将直接完成任务，无法撤销。"
-                    onConfirm={async () => {
-                      try {
-                        const response = await fetch(`/api/tasks/${currentTask.id}`, {
-                          method: 'PUT',
-                          headers: {
-                            'Content-Type': 'application/json'
-                          },
-                          body: JSON.stringify({
-                            status: 'completed'
-                          })
-                        });
-                        
-                        const data = await response.json();
-                        if (data.success) {
-                          message.success('任务已强制结束');
-                          // 重新加载数据
-                          window.location.reload();
-                        } else {
-                          message.error(data.message || '结束失败');
-                        }
-                      } catch (error) {
-                        message.error('结束失败');
-                      }
-                    }}
-                    okText="确定结束"
-                    cancelText="取消"
-                    okType="danger"
-                  >
-                    <Button 
-                      size="small" 
-                      danger 
-                      icon={<StopOutlined />}
-                    >
-                      强制结束
-                    </Button>
-                  </Popconfirm>
+                <div style={{ marginTop: 12, fontSize: 12, color: '#999' }}>
+                  创建时间: {new Date((currentTask as any).created_time || (currentTask as any).createdTime).toLocaleString('zh-CN', {
+                    timeZone: 'Asia/Shanghai',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                  })}
                 </div>
               </div>
             ) : (

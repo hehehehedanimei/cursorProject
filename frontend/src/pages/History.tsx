@@ -9,9 +9,10 @@ import {
   Typography, 
   Descriptions,
   message,
-  Pagination
+  Pagination,
+  Popconfirm
 } from 'antd';
-import { EyeOutlined, DownloadOutlined } from '@ant-design/icons';
+import { EyeOutlined, DownloadOutlined, StopOutlined } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store';
 import { fetchHistory, fetchHistoryDetail, exportHistory } from '../store/slices/historySlice';
@@ -48,6 +49,31 @@ const History: React.FC = () => {
 
   const handlePageChange = (page: number, pageSize?: number) => {
     dispatch(fetchHistory({ page, pageSize: pageSize || 10 }));
+  };
+
+  const handleForceComplete = async (taskId: number) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: 'completed'
+        })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        message.success('任务已强制结束');
+        // 重新加载历史记录
+        dispatch(fetchHistory({ page: pagination.current, pageSize: pagination.pageSize }));
+      } else {
+        message.error(data.message || '结束失败');
+      }
+    } catch (error) {
+      message.error('结束失败');
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -132,7 +158,7 @@ const History: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 200,
       render: (_: any, record: any) => (
         <Space>
           <Button 
@@ -149,6 +175,24 @@ const History: React.FC = () => {
           >
             导出
           </Button>
+          {record.task.status === 'in_progress' && (
+            <Popconfirm
+              title="强制结束任务"
+              description="确定要强制结束此任务吗？这将直接完成任务，无法撤销。"
+              onConfirm={() => handleForceComplete(record.task.id)}
+              okText="确定结束"
+              cancelText="取消"
+              okType="danger"
+            >
+              <Button 
+                size="small" 
+                danger 
+                icon={<StopOutlined />}
+              >
+                强制结束
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },

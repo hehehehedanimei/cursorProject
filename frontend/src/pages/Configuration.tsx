@@ -13,7 +13,7 @@ import {
   Popconfirm,
   InputNumber,
   Tag,
-  Collapse,
+
   Row,
   Col
 } from 'antd';
@@ -29,7 +29,7 @@ const { TabPane } = Tabs;
 const Configuration: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const [form] = Form.useForm();
-  const [flowForm] = Form.useForm();
+
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isFlowModalVisible, setIsFlowModalVisible] = useState(false);
   const [editingService, setEditingService] = useState<any>(null);
